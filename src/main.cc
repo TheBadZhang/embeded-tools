@@ -2,9 +2,6 @@
 #include "graphics.h"
 #include <iostream>
 
-#include "microui_impl_ege.h"
-#include "microui.h"
-
 uint8_t rgb2bit(color_t c) {
 	return (0.299*EGEGET_R(c)+0.587*EGEGET_G(c)+0.114*EGEGET_B(c)) > 128 ? 1 : 0;
 }
@@ -44,24 +41,6 @@ void gen_code_from_image(std::string path) {
 	puts("};");
 }
 
-extern "C" {
-
-typedef struct mu_Context mu_Context;
-
-void style_window(mu_Context *ctx);
-void log_window(mu_Context *ctx);
-void test_window(mu_Context *ctx);
-
-extern float bg[3];
-}
-static void process_frame(mu_Context *ctx) {
-	mu_begin(ctx);
-	test_window(ctx);
-	log_window(ctx);
-	style_window(ctx);
-	mu_end(ctx);
-}
-
 int main (int argc, char* argv[]) {
 	// 手动刷新模式
 	ege::setinitmode (INIT_RENDERMANUAL);
@@ -69,33 +48,8 @@ int main (int argc, char* argv[]) {
 	ege::initgraph (800, 600);
 	ege::setbkmode (TRANSPARENT);
 
-	// 初始化 microui
-	mu_Context ctx_c;
-	mu_Context *ctx = &ctx_c;
-	mu_init(ctx);
-
-	// 适配 EGE 平台
-	microui_impl_ege_init(ctx);
-
 	gen_code_from_image("./res/psychic-swamp-v2_1.png");
-
-	/* main loop */
-	while (ege::is_run()) {
-		/* handle events */
-		microui_impl_ege_process_events(ctx);
-
-		/* process frame */
-		process_frame(ctx);
-
-		/* render */
-		ege::setbkcolor_f(EGERGBA((int)bg[0], (int)bg[1], (int)bg[2], (int)bg[3]));
-		ege::cleardevice();
-		microui_impl_ege_draw_data(ctx);
-
-		ege::delay_ms(0);
-	}
-
-	microui_impl_ege_shutdown();
+	getch();
 	ege::closegraph();
 	return 0;
 }
