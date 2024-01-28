@@ -1,0 +1,9 @@
+.history
+.DS_Store
+.xmake
+.vscode
+
+build/**
+
+*.png
+*.jpg
