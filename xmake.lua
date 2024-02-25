@@ -1,6 +1,4 @@
--- add_rules("mode.debug", "mode.release")
-add_repositories("xege-repo git@gitee.com:xege/ege-xrepo.git")
-add_requires("xege 20.08")
+add_rules("mode.debug", "mode.release")
 add_requires("imgui", {configs = {glfw_opengl3 = true}})
 add_requires("stb")
 
@@ -12,13 +10,4 @@ target("main")
 	set_languages("c++23")
 	set_encodings("utf-8")
 	-- set_warnings("everything")
-	set_rundir("$(projectdir)")
-
-
-target ("u8g2_font_test")
-	add_defines("__STDC_LIMIT_MACROS")
-	add_packages("xege")
-	set_kind("binary")
-	set_languages("c++2a")
-	add_files("$(projectdir)/u8g2_font_test/main.cc")
 	set_rundir("$(projectdir)")
