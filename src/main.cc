@@ -9,10 +9,11 @@
 #include "stb_image_write.h"
 // #define GL_CLAMP_TO_EDGE 0x812F
 // #define IMGUI_IMPL_OPENGL_ES2
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "ImGuiFileDialogConfig.h"
+#include "ImGuiFileDialog.h"
 #include <cstdio>
 #include <array>
 #include <iostream>
@@ -147,11 +148,6 @@ void gen_code_from_image(std::string path, MODE mode) {
 }
 void gen_code_from_image_sprites(std::string path, MODE mode, int sprite_width, int sprite_height) {
 
-	// ege::PIMAGE pic = ege::newimage ();
-	// ege::getimage (pic, path.c_str());
-	// ege::putimage (0, 0, pic);
-	// int pic_width  = ege::getwidth  (pic);
-	// int pic_height = ege::getheight (pic);
 	int pic_width, pic_height, comp;
 	uint8_t* pic = stbi_load(path.c_str(), &pic_width, &pic_height, &comp, 4);
 
@@ -222,13 +218,12 @@ void gen_code_from_image_sprites(std::string path, MODE mode, int sprite_width, 
 }
 
 
+::std::array<float, 100> wave;
 
 
 static void glfw_error_callback(int error, const char* description) {
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
-
-::std::array<float, 100> wave;
 
 int main(int, char**) {
 	// Setup window
@@ -271,8 +266,8 @@ int main(int, char**) {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	// io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 	// Setup Platform/Renderer backends
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -290,7 +285,7 @@ int main(int, char**) {
 	// - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
 	// - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
 	// - Read 'docs/FONTS.md' for more instructions and details.
-	float size_in_pixels = 18.0f;
+	float size_in_pixels = 36.0f;
 	ImFont* font = io.Fonts->AddFontFromFileTTF("./res/wqy16.ttf", size_in_pixels, NULL, io.Fonts->GetGlyphRangesChineseFull());  // Load Japanese characters
 	IM_ASSERT(font != NULL);
 
@@ -310,6 +305,10 @@ int main(int, char**) {
 
 	// gen_code_from_image_sprites("./normal_keys.png", MODE::BIT1, 16, 16);
 
+	int image_width, image_height, comp;
+	GLuint image_texture = 0;
+
+	bool show_imgui_file_dialog = false;
 
 	// Main loop
 	for (;!glfwWindowShouldClose(window);
@@ -354,6 +353,39 @@ int main(int, char**) {
 			wave[n] = sinf(n * 0.2f + ImGui::GetTime() * 1.5f);
 		ImGui::PlotLines("正弦波", wave.data(), 100);
 		ImGui::End();
+
+		ImGui::Begin("图片转代码");
+
+		if (not show_imgui_file_dialog) {
+			if (ImGui::Button("打开图片选择器")) {
+				IGFD::FileDialogConfig config;config.path = ".";
+				show_imgui_file_dialog = true;
+				::std::string filters = "Image files (*.png *.gif *.jpg *.jpeg){.png,.gif,.jpg,.jpeg}";
+				ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "选择图片", filters.c_str(), config);
+			}
+		} else {
+			if (ImGui::Button("关闭图片选择器")) {
+
+				// action
+				show_imgui_file_dialog = false;
+				// close
+				ImGuiFileDialog::Instance()->Close();
+			}
+		}
+
+		if (show_imgui_file_dialog) {
+			// display
+			if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
+				if (ImGuiFileDialog::Instance()->IsOk()) { // action if OK
+					std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+					std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
+
+					bool ret = LoadTextureFromFile(filePathName.c_str(), &my_image_texture, &my_image_width, &my_image_height);
+					IM_ASSERT(ret);
+				}
+			}
+		}
+		ImGui::EndFrame();
 		// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
 		{
 			static float f = 0.0f;
