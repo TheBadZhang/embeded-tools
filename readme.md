@@ -11,3 +11,12 @@
 ## 待做
 
 [LCD 字符编辑工具](https://maxpromer.github.io/LCD-Character-Creator/)
+
+libxbmp 集成 stb
+然后就做成了一个图片处理工具
+再把libxbmp集成到imgui中
+方便处理图片并在imgui中显示
+
+## 目前已知的问题
+
+打开图片显示图片会产生内存泄露，如果打开的图片太多了，会把内存吃完
