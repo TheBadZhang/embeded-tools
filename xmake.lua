@@ -2,6 +2,11 @@ add_rules("mode.debug", "mode.release")
 add_requires("imgui", {configs = {glfw_opengl3 = true}})
 -- add_requires("imgui-file-dialog")
 add_requires("stb")
+add_requires("freetype")
+
+if is_plat("windows") then
+	add_defines("__STDC_LIMIT_MACROS")
+end
 
 target("imgui-file-dialog")
 	set_kind("static")
@@ -15,9 +20,9 @@ target("imgui-file-dialog")
 
 target("main")
 	set_kind("binary")
-	add_defines("__STDC_LIMIT_MACROS")
+	add_includedirs("src/")
 	add_files("src/main.cc")
-	add_packages("imgui", "stb")
+	add_packages("imgui", "stb", "freetype")
 	add_deps("imgui-file-dialog")
 	set_languages("c++23")
 	set_encodings("utf-8")

@@ -2,27 +2,8 @@
 // (GLFW is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context creation, etc.)
 // If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
 // Read online: https://github.com/ocornut/imgui/tree/master/docs
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
-// #define GL_CLAMP_TO_EDGE 0x812F
-// #define IMGUI_IMPL_OPENGL_ES2
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-#include "ImGuiFileDialogConfig.h"
-#include "ImGuiFileDialog.h"
-#include <cstdio>
-#include <array>
-#include <iostream>
-#include <string>
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <GLES2/gl2.h>
-#endif
-#undef GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
+#include <imgui.h>
+#include "common.hpp"
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -33,13 +14,175 @@
 
 
 
+#include <ft2build.h>
+#include <freetype/freetype.h>
+#include <freetype/ftglyph.h>
+#include <freetype/ftpfr.h>
+#include <freetype/ftadvanc.h>
+
+#include <cstdint>
+
+/* 字体数据（ttf） */
+typedef struct _ft_fontinfo {
+	FT_Face    face;     /* FreeType库句柄对象 */
+	FT_Library library;  /* 外观对象（描述了特定字样和风格，比如斜体风格等） */
+	int32_t     mono;    /* 是否为二值化模式 */
+} ft_fontinfo;
+
+/* 字模格式常量定义 */
+typedef enum _glyph_format_t {
+	GLYPH_FMT_ALPHA, /* 每个像素占用1个字节 */
+	GLYPH_FMT_MONO,  /* 每个像素占用1个比特 */
+} glyph_format_t;
+
+/* 字模（位图） */
+typedef struct _glyph_t {
+	int16_t  x;
+	int16_t  y;
+	uint16_t w;
+	uint16_t h;
+	uint16_t advance;  /* 占位宽度 */
+	uint8_t  format;   /* 字模格式 */
+	uint8_t  pitch;    /* 跨距（每行像素个数 * 单个像素所占字节数） */
+	uint8_t  *data;    /* 字模数据：每个像素点占用一个字节 */
+	void     *handle;  /* 保存需要释放的句柄 */
+} glyph_t;
+
+
+/* 获取二值化位图上像素点的值 */
+uint8_t bitmap_mono_get_pixel(const uint8_t* buff, uint32_t w, uint32_t h, uint32_t x, uint32_t y) {
+	/* 计算字节偏移 */
+	uint32_t line_length = ((w + 15) >> 4) << 1;
+	uint32_t offset = y * line_length + (x >> 3);
+
+	/* 计算位偏移 */
+	uint32_t offset_bit = 7 - (x % 8);
+
+	const uint8_t* data = buff + offset;
+	if (buff == NULL || (x > w && y > h))
+		return 0;
+	return (*data >> offset_bit) & 0x1;
+}
+
+/* 获取字模 */
+static int font_ft_get_glyph(ft_fontinfo *font_info, wchar_t c, float font_size, glyph_t* g) {
+	FT_Glyph glyph;
+	FT_GlyphSlot glyf;
+	FT_Int32 flags = FT_LOAD_DEFAULT | FT_LOAD_RENDER | FT_LOAD_NO_BITMAP;
+
+	if (font_info->mono) {
+		flags |= FT_LOAD_TARGET_MONO;
+	}
+	/* 设置字体大小 */
+	FT_Set_Char_Size(font_info->face, 0, font_size * 64, 0, 72);
+	// FT_Set_Pixel_Sizes(font_info->face, 0, font_size);
+
+	/* 通过编码加载字形并将其转化为位图（保存在face->glyph->bitmap中） */
+	if (!FT_Load_Char(font_info->face, c, flags)) {
+		glyf = font_info->face->glyph;
+		FT_Get_Glyph(glyf, &glyph);
+		// FT_Render_Glyph(glyf, FT_RENDER_MODE_NORMAL);
+
+		g->format = GLYPH_FMT_ALPHA;
+		g->h = glyf->bitmap.rows;
+		g->w = glyf->bitmap.width;
+		g->pitch = glyf->bitmap.pitch;
+		g->x = glyf->bitmap_left;
+		g->y = -glyf->bitmap_top;
+		g->data = glyf->bitmap.buffer;
+		g->advance = glyf->metrics.horiAdvance / 64;
+
+		if (g->data != NULL) {
+			if (glyf->bitmap.pixel_mode == FT_PIXEL_MODE_MONO) {
+				g->format = GLYPH_FMT_MONO;
+			}
+			g->handle = glyph;
+		}
+		else {
+			FT_Done_Glyph(glyph);
+		}
+	}
+	return g->data != NULL || c == ' ' ? 1 : 0;
+}
 
 
 
+	ft_fontinfo   font_info;         /* 字库信息 */
+	long int      size = 0;          /* 字库文件大小 */
+	unsigned char *font_buf = NULL;  /* 字库文件数据 */
 
+int load_font(std::string path) {
+
+	/* 加载字库文件存入font_buf */
+	FILE *font_file = fopen(path.c_str(), "rb");
+	if (font_file == NULL) {
+		printf("Can not open font file!\n");
+		getchar();
+		return 0;
+	}
+	fseek(font_file, 0, SEEK_END); /* 设置文件指针到文件尾，基于文件尾偏移0字节 */
+	size = ftell(font_file);       /* 获取文件大小（文件尾 - 文件头  单位：字节） */
+	fseek(font_file, 0, SEEK_SET); /* 重新设置文件指针到文件头 */
+
+	font_buf = (unsigned char*)calloc(size, sizeof(unsigned char));
+	fread(font_buf, size, 1, font_file);
+	fclose(font_file);
+
+	font_info.mono = 1;  /* 设置为二值化模式 */
+
+	/* 初始化FreeType */
+	FT_Init_FreeType(&(font_info.library));
+
+	/* 从font_buf中提取外观 */
+	FT_New_Memory_Face(font_info.library, font_buf, size, 0, &(font_info.face));
+
+	/* 设置字体编码方式为UNICODE */
+	FT_Select_Charmap(font_info.face, FT_ENCODING_UNICODE);
+
+}
+int drawFreeType_char(int x, int y, wchar_t ch) {
+	glyph_t g;
+	// wchar_t c = L'a';
+	float   font_size = 18;  /* 设置字体大小 */
+	font_ft_get_glyph(&font_info, ch, font_size, &g);  /* 获取字模 */
+
+/* 打印字模信息 */
+	int i = 0, j = 0;
+	if (g.format == GLYPH_FMT_MONO) {
+		for (j = 0; j < g.h; ++j) {
+			for (i = 0; i < g.w; ++i) {
+				uint8_t pixel = bitmap_mono_get_pixel(g.data, g.w, g.h, i, j);
+				// putpixel(x+i, y+g.y+j, pixel ? (EGERGB(255,255,255)) : (EGERGB(0,0,0)));
+				// if (pixel) screen_pic.drawPixel(x+i, y+g.y+j);
+			}
+		}
+	} else if (g.format == GLYPH_FMT_ALPHA) {
+		for (j = 0; j < g.h; ++j) {
+			for (i = 0; i < g.w; ++i) {
+				uint8_t pixel = g.data[j*g.w + i];
+				// putpixel (x+i, y+g.y+j, EGERGB(pixel, pixel, pixel));
+			}
+		}
+	}
+
+	return g.w;
+}
+/*
+void drawFreeType_str(int x, int y, std::span<wchar_t> strw) {
+	int w = 0;
+	for (int i = 0; i < strw.size(); i++) {
+		if (x > 128-w) {
+			x = 0;
+			y += 16 + 2;
+		}
+		w = drawFreeType_char(x, y, strw[i]) + 1;
+		x += w;
+	}
+}
+*/
 
 // Simple helper function to load an image into a OpenGL texture with common settings
-bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height) {
+bool LoadTextureFromFile(const char* filename, GLuint* out_texture, ImVec2& out_image_size) {
 	// Load from file
 	int image_width = 0;
 	int image_height = 0;
@@ -66,8 +209,7 @@ bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_wid
 	stbi_image_free(image_data);
 
 	*out_texture = image_texture;
-	*out_width = image_width;
-	*out_height = image_height;
+	out_image_size = ImVec2((float)image_width, (float)image_height);
 
 	return true;
 }
@@ -218,12 +360,12 @@ void gen_code_from_image_sprites(std::string path, MODE mode, int sprite_width, 
 }
 
 
-::std::array<float, 100> wave;
-
 
 static void glfw_error_callback(int error, const char* description) {
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
+
+#include "image2code.hpp"
 
 int main(int, char**) {
 	// Setup window
@@ -256,7 +398,7 @@ int main(int, char**) {
 
 	// Create window with graphics context
 	::std::string title = "image2code";
-	GLFWwindow* window = glfwCreateWindow(1280, 720, title.c_str(), NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(1920, 1080, title.c_str(), NULL, NULL);
 	if (window == NULL)
 		return 1;
 	glfwMakeContextCurrent(window);
@@ -294,25 +436,17 @@ int main(int, char**) {
 	bool show_another_window = false;
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-	int my_image_width = 0;
-	int my_image_height = 0;
-	GLuint my_image_texture = 0;
-	bool ret = LoadTextureFromFile("./res/MyImage01.jpg", &my_image_texture, &my_image_width, &my_image_height);
-	IM_ASSERT(ret);
-
 	// ::std::string image_name = "MyImage01.jpg";
-	// unsigned char* pic = stbi_load(image_name.c_str(), &my_image_width, &my_image_height, NULL, 4);
+	// unsigned char* pic = stbi_load(image_name.c_str(), &my_image_width, &my_image.y, NULL, 4);
 
 	// gen_code_from_image_sprites("./normal_keys.png", MODE::BIT1, 16, 16);
 
-	int image_width, image_height, comp;
-	GLuint image_texture = 0;
-
-	bool show_imgui_file_dialog = false;
+	image2code.setIO(&io);
 
 	// Main loop
 	for (;!glfwWindowShouldClose(window);
 		[&]() -> void {
+			ImGui::EndFrame();
 			// Rendering
 			ImGui::Render();
 			int display_w, display_h;
@@ -337,56 +471,23 @@ int main(int, char**) {
 		ImGui::NewFrame();
 
 		// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-		// if (show_demo_window)
-		//     ImGui::ShowDemoWindow(&show_demo_window);
-		ImGui::Begin("图片使用范例");
-		ImGui::Text("pointer = %p", my_image_texture);
-		ImGui::Text("size = %d x %d", my_image_width, my_image_height);
-		auto frame_size = ImGui::GetContentRegionMax();
-		if (frame_size.x > frame_size.y) {
-			frame_size.x = frame_size.y * my_image_width / my_image_height;
-		} else {
-			frame_size.y = frame_size.x * my_image_height / my_image_width;
-		}
-		ImGui::Image((void*)(intptr_t)my_image_texture, frame_size);
+		if (show_demo_window)
+			ImGui::ShowDemoWindow(&show_demo_window);
+
+
+
+
+		image2code.ui();
+
+		::ImGui::Begin("图表测试");
+		::std::array<float, 100> wave;
 		for (int n = 0; n < 100; n++)
-			wave[n] = sinf(n * 0.2f + ImGui::GetTime() * 1.5f);
-		ImGui::PlotLines("正弦波", wave.data(), 100);
-		ImGui::End();
+			wave[n] = sinf(n * 0.2f + ::ImGui::GetTime() * 1.5f);
+		::ImGui::PlotLines("正弦波", wave.data(), 100);
+		::ImGui::End();
 
-		ImGui::Begin("图片转代码");
-
-		if (not show_imgui_file_dialog) {
-			if (ImGui::Button("打开图片选择器")) {
-				IGFD::FileDialogConfig config;config.path = ".";
-				show_imgui_file_dialog = true;
-				::std::string filters = "Image files (*.png *.gif *.jpg *.jpeg){.png,.gif,.jpg,.jpeg}";
-				ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "选择图片", filters.c_str(), config);
-			}
-		} else {
-			if (ImGui::Button("关闭图片选择器")) {
-
-				// action
-				show_imgui_file_dialog = false;
-				// close
-				ImGuiFileDialog::Instance()->Close();
-			}
-		}
-
-		if (show_imgui_file_dialog) {
-			// display
-			if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
-				if (ImGuiFileDialog::Instance()->IsOk()) { // action if OK
-					std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-					std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
-
-					bool ret = LoadTextureFromFile(filePathName.c_str(), &my_image_texture, &my_image_width, &my_image_height);
-					IM_ASSERT(ret);
-				}
-			}
-		}
-		ImGui::EndFrame();
 		// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+		if (false)
 		{
 			static float f = 0.0f;
 			static int counter = 0;
