@@ -215,157 +215,15 @@ bool LoadTextureFromFile(const char* filename, GLuint* out_texture, ImVec2& out_
 }
 
 
-
-#define GET_R(c) ((c) & 0xff)
-#define GET_G(c) (((c) >> 8) & 0xff)
-#define GET_B(c) (((c) >> 16) & 0xff)
-uint8_t rgb2bit(uint32_t c) {
-	return (0.299*GET_R(c)+0.587*GET_G(c)+0.114*GET_B(c));
-}
-
-enum class MODE {
-	BIT1, BIT4, BIT8, BIT16
-};
-
-uint32_t getpixel (int x, int y, uint8_t* pic, int width, int height) {
-	return *(uint32_t*)(pic + (x + y * width) * 4);
-}
-
-void gen_code_from_image(std::string path, MODE mode) {
-
-	int pic_width, pic_height, comp;
-	uint8_t* pic = stbi_load(path.c_str(), &pic_width, &pic_height, &comp, 4);
-
-
-	// 数组头
-	printf("const uint8_t name[] = {\n0x%02x,0x%02x,", pic_width, pic_height);
-	printf("    // %d x %d\n", pic_width, pic_height);
-
-	int blen;
-	switch (mode) {
-		case MODE::BIT1: {
-			blen = (pic_width + 7) / 8;
-		} break;
-		case MODE::BIT4: {
-			blen = (pic_width + 1) / 2;
-		} break;
-		case MODE::BIT8: {
-			blen = pic_width;
-		} break;
-		case MODE::BIT16: {
-			blen = pic_width * 2;
-		} break;
-	}
-	// 输出的行数
-	// 一行一行处理
-	for (int j = 0; j < pic_height; j++) {
-		// 一行对应多少字节
-		for (int i = 0; i < blen; i++) {
-			unsigned char pixel = 0;
-			switch (mode) {
-				case MODE::BIT1: {
-					// 每个字节可以表达8个像素点
-					for (int k = 0; k < 8; k++) {
-						// 对像素点求灰度值后再计算
-						uint8_t c = rgb2bit(getpixel (i * 8 + k, j, pic, pic_width, pic_height));
-						pixel |= (c > 127 ? 0x01 : 0x00) << (k);      // 低位在前
-						// pixel |= (getpixel (i * 8 + k, j, pic) & 0x01) << (7-k);    // 高位在前
-					}
-				} break;
-				case MODE::BIT4: {
-					for (int k = 0; k < 2; k++) {
-						uint8_t c = rgb2bit(getpixel (i * 2 + k, j, pic, pic_width, pic_height)) >> 4;
-						if (c == 0x01) c = 0x00;
-						pixel |= (c) << ((1-k) * 4);      // 低位在前
-					}
-				} break;
-			}
-			printf ("0x%02x,", (pixel) & 0xff);
-			// std::cout << std::hex << (int)pixel << ",";
-
-		}
-		printf("\n");
-	}
-	puts("};");
-}
-void gen_code_from_image_sprites(std::string path, MODE mode, int sprite_width, int sprite_height) {
-
-	int pic_width, pic_height, comp;
-	uint8_t* pic = stbi_load(path.c_str(), &pic_width, &pic_height, &comp, 4);
-
-	// 数组头
-	printf("const uint8_t name[] = {\n0x%02x,0x%02x,", pic_width, pic_height);
-	printf("    // %d x %d\n", pic_width, pic_height);
-
-	int blen;
-	switch (mode) {
-		case MODE::BIT1: {
-			blen = (sprite_width + 7) / 8;
-		} break;
-		case MODE::BIT4: {
-			blen = (sprite_width + 1) / 2;
-		} break;
-		case MODE::BIT8: {
-			blen = sprite_width;
-		} break;
-		case MODE::BIT16: {
-			blen = sprite_width * 2;
-		} break;
-	}
-	// 输出的行数
-
-	// 当精灵图大小和图片大小完全一致的时候，相当于上面那个函数的功能了
-	// 有多少行精灵图
-	for (int i = 0; i < pic_height/sprite_height; i++) {
-		// 一行对应多少精灵图
-		for (int j = 0; j < pic_width/sprite_width; j++) {
-			// 一个精灵图的行
-			for (int k = 0; k < sprite_height; k++) {
-				for (int l = 0; l < blen; l++) {
-					unsigned char pixel = 0;
-					switch (mode) {
-						case MODE::BIT1: {
-							// 每个字节可以表达8个像素点
-							for (int m = 0; m < 8; m++) {
-								// 对像素点求灰度值后再计算
-								int sprite_relative_x = l * 8 + m;
-								if (sprite_relative_x >= sprite_width) break;
-								int x = j * sprite_width + sprite_relative_x;
-								int y = i * sprite_height + k;
-								uint8_t c = rgb2bit(getpixel (x, y, pic, pic_width, pic_height));
-								// putpixel (x+300, y+300, EGERGB(c,c,c));
-								pixel |= (c > 127 ? 0x01 : 0x00) << (m);      // 低位在前
-								// pixel |= (getpixel (i * 8 + k, j, pic) & 0x01) << (7-k);    // 高位在前
-							}
-						} break;
-						case MODE::BIT4: {
-							for (int m = 0; m < 2; m++) {
-								int sprite_relative_x = l * 2 + m;
-								if (sprite_relative_x >= sprite_width) break;
-								int x = j * sprite_width + sprite_relative_x;
-								int y = i * sprite_height + k;
-								uint8_t c = rgb2bit(getpixel (x, y, pic, pic_width, pic_height)) >> 4;
-								if (c == 0x01) c = 0x00;
-								pixel |= (c) << ((1-m) * 4);      // 低位在前
-							}
-						} break;
-					}
-					printf ("0x%02x,", (pixel) & 0xff);
-				}
-			}
-			printf("\n");
-		}
-	}
-	puts("};");
-}
-
-
-
 static void glfw_error_callback(int error, const char* description) {
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
 #include "image2code.hpp"
+Image2Code image2code;
+
+#include "SerialMonitor.hpp"
+SerialMonitor serialMonitor;
 
 int main(int, char**) {
 	// Setup window
@@ -432,7 +290,7 @@ int main(int, char**) {
 	IM_ASSERT(font != NULL);
 
 	// Our state
-	bool show_demo_window = true;
+	bool show_demo_window = false;
 	bool show_another_window = false;
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -442,6 +300,8 @@ int main(int, char**) {
 	// gen_code_from_image_sprites("./normal_keys.png", MODE::BIT1, 16, 16);
 
 	image2code.setIO(&io);
+	serialMonitor.setIO(&io);
+
 
 	// Main loop
 	for (;!glfwWindowShouldClose(window);
@@ -470,25 +330,28 @@ int main(int, char**) {
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
+		if (true) {
+			image2code.ui();
+		}
+		if (false) {
+			serialMonitor.ui();
+		}
+
+		if (false) {
+			::ImGui::Begin("图表测试");
+			::std::array<float, 100> wave;
+			for (int n = 0; n < 100; n++)
+				wave[n] = sinf(n * 0.2f + ::ImGui::GetTime() * 1.5f);
+			::ImGui::PlotLines("正弦波", wave.data(), 100);
+			::ImGui::End();
+		}
+
 		// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
 		if (show_demo_window)
 			ImGui::ShowDemoWindow(&show_demo_window);
 
-
-
-
-		image2code.ui();
-
-		::ImGui::Begin("图表测试");
-		::std::array<float, 100> wave;
-		for (int n = 0; n < 100; n++)
-			wave[n] = sinf(n * 0.2f + ::ImGui::GetTime() * 1.5f);
-		::ImGui::PlotLines("正弦波", wave.data(), 100);
-		::ImGui::End();
-
 		// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-		if (false)
-		{
+		if (false) {
 			static float f = 0.0f;
 			static int counter = 0;
 
@@ -510,8 +373,7 @@ int main(int, char**) {
 		}
 
 		// 3. Show another simple window.
-		if (show_another_window)
-		{
+		if (show_another_window) {
 			ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
 			ImGui::Text("Hello from another window!");
 			if (ImGui::Button("Close Me"))
