@@ -4,6 +4,7 @@
 #include <imgui.h>
 #include <serial/serial.h>
 #include "coding_convert.hpp"
+#include <windows.h>
 
 class SerialMonitor {
 private:
@@ -13,6 +14,10 @@ public:
 	SerialMonitor() {
 
 		ports_listed = ::serial::list_ports();
+
+		for (auto& port : ports_listed) {
+			port.description = GbkToUtf8(port.description.c_str());
+		}
 	}
 	~SerialMonitor() {}
 	void setIO(ImGuiIO* io) {
@@ -24,7 +29,6 @@ public:
 		::ImGui::SeparatorText("串口列表");
 		::ImGui::BeginChild("串口列表", ImVec2(0, 0), true);
 		for (auto& port : ports_listed) {
-			// port.description = GbkToUtf8(port.description.c_str());
 			::std::string com = ::std::format("com: {}\ndesc: {}\nhwid: {}\n", port.port, port.description, port.hardware_id);
 			// ::std::cout << com << ::std::endl;
 			::ImGui::Text(com.c_str());

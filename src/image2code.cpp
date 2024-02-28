@@ -1,5 +1,5 @@
 #include "image2code.hpp"
-
+#include <imgui.h>
 
 void Image2Code::gen_code_from_image_sprites(std::string path) {
 
@@ -83,9 +83,8 @@ void Image2Code::gen_code_from_image_sprites(std::string path) {
 }
 
 
-void Image2Code::picture_preview (void) {
+void Image2Code::picture_preview (bool horizontal) {
 
-	ImGui::Begin("图片预览");
 	::ImGui::BeginGroup();
 
 	static bool use_text_color_for_tint = false;
@@ -95,6 +94,8 @@ void Image2Code::picture_preview (void) {
 	ImVec4 tint_col = use_text_color_for_tint ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
 	ImVec4 border_col = ImGui::GetStyleColorVec4(ImGuiCol_Border);
 	auto region = ImGui::GetContentRegionMax();
+	if (horizontal) region.x /= 2.05;
+	else region.x /= 1.01;
 	if (region.x < my_image.x) {
 		region.y = region.x * my_image.y / my_image.x;
 	} else {
@@ -103,7 +104,10 @@ void Image2Code::picture_preview (void) {
 	}
 	region.x = region.x;
 	region.y = region.y;
+	::ImVec2 p = ::ImGui::GetCursorScreenPos();
 	ImGui::Image((void*)(intptr_t)my_image_texture, region, uv_min, uv_max, tint_col, border_col);
+	// pic->Render();
+
 	if (ImGui::BeginItemTooltip())
 	{
 		float region_sz = 32.0f;
@@ -119,13 +123,44 @@ void Image2Code::picture_preview (void) {
 		ImVec2 uv0 = ImVec2((region_x) / region.x, (region_y) / region.y);
 		ImVec2 uv1 = ImVec2((region_x + region_sz) / region.x, (region_y + region_sz) / region.y);
 		ImGui::Image((void*)(intptr_t)my_image_texture, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1, tint_col, border_col);
+		// pic->Render();
 		ImGui::EndTooltip();
+	}
+
+	::ImDrawList* draw_list = ::ImGui::GetWindowDrawList();
+	::ImVec2 a = ::ImVec2(p.x + region.x, p.y + region.y);
+	// draw_list->AddLine(p, a, ::ImColor(255, 255, 0, 255), 10);
+	draw_list -> AddRect(p, a, ::ImColor(255, 255, 0, 255), 1, 0, 1.0f);
+
+	// for (int i = 0; i < buf.size()/4; i++) {
+	// 	buf[i * 4 + 0] = rand()%256;
+	// 	buf[i * 4 + 1] = rand()%256;
+	// 	buf[i * 4 + 2] = rand()%256;
+	// 	buf[i * 4 + 3] = rand()%256;
+	// }
+	char* pbuf = (char*)buf.data();
+	// static int x, y;
+	if (pbuf != nullptr) {
+		pic.set_pic((uint8_t*)pbuf, my_image.x, my_image.y);
+		color.r = transparent_color[0] * 255;
+		color.g = transparent_color[1] * 255;
+		color.b = transparent_color[2] * 255;
+		uint32_t c = color.r << 24 | color.g << 16 | color.b << 8 | 0xff;
+		pic.setColor(c);
+		pic.drawCircle(100, 100, 50, 70);
+		int x = rand()%200;
+		int y = rand()%200;
+		int w = rand()%200;
+		int h = rand()%200;
+		pic.drawBox(x, y, x+w, y+h);
+		pic.setColor(0xeffeefff);
+		pic.drawLine(10, 10, 200, 200);
+		::UpdateTextureFromBuffer(pbuf, my_image, my_image_texture);
+		// draw_list -> AddImage((void*)(intptr_t)my_image_texture, p, a);
 	}
 
 	::ImGui::EndGroup();
 
-
-	ImGui::End();
 
 }
 
@@ -155,7 +190,11 @@ void Image2Code::open_picture(void) {
 				filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
 				filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
 
-				bool ret = LoadTextureFromFile(filePathName.c_str(), &my_image_texture, my_image);
+				bool ret = LoadTextureFromFile(filePathName.c_str(), &my_image_texture, my_image, buf);
+				// pic = LoadTextureFromFile(filePathName.c_str(), &my_image_texture, my_image);
+				// int width = my_image.x;
+				// int height = my_image.y;
+				// buf.resize(width * height * 4);
 				IM_ASSERT(ret);
 			}
 		}
@@ -163,19 +202,41 @@ void Image2Code::open_picture(void) {
 }
 
 void Image2Code::ui(void) {
-	picture_preview();
-	::ImGui::Begin("图片转换工具");
 
+	static MemoryEditor mem_edit;
+	mem_edit.DrawWindow("Memory Editor", buf.data(), buf.size());
+
+	ImGui::Begin("图片预览");
+	static bool horizontal = false;
+	::ImGui::Checkbox("左右对比", &horizontal);
+	::ImGui::BeginGroup();
+	::ImGui::SeparatorText("原图");
+	picture_preview(horizontal);
+	::ImGui::EndGroup();
+	if (horizontal) ::ImGui::SameLine();
+	::ImGui::BeginGroup();
+	::ImGui::SeparatorText("预览图");
+	picture_preview(horizontal);
+	::ImGui::EndGroup();
+	::ImGui::End();
+
+
+	::ImGui::Begin("图片转换工具");
+	static float value = 0;
+
+	if (ImGuiKnobs::Knob("Volume", &value, -6.0f, 6.0f, 0.1f, "%.1fdB", ImGuiKnobVariant_Tick)) {
+		// value was changed
+	}
 	::ImGui::BeginGroup();
 	::ImGui::SeparatorText("文件路径");
-	::ImGui::InputText("", filePathName.data(), 1024);
+	::ImGui::InputText("", &filePathName, 1024);
 	::ImGui::SameLine();
 	open_picture();
 	::ImGui::EndGroup();
 
 	::ImGui::BeginGroup();
 	::ImGui::SeparatorText("文件夹路径");
-	::ImGui::InputText("", filePath.data(), 1024);
+	::ImGui::InputText("", &filePath, 1024);
 	::ImGui::SameLine();
 	::ImGui::Button("选择文件夹");
 	::ImGui::EndGroup();
@@ -242,7 +303,7 @@ void Image2Code::ui(void) {
 	{
 		::ImGui::BeginGroup();
 		::ImGui::SeparatorText("透明色");
-		ImGui::ColorEdit3("颜色", transparent_colot);
+		ImGui::ColorEdit3("颜色", transparent_color);
 		::ImGui::EndGroup();
 	}
 	{

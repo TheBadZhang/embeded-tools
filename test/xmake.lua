@@ -1,0 +1,10 @@
+target("sol-test")
+
+	set_kind("binary")
+	add_includedirs("./sol-test/")
+	add_files("./sol-test/main.cc")
+	add_packages("cmdline", "sol2", "lua", "nlohmann_json", "tinyexpr")
+	set_languages("c++20")
+	set_encodings("utf-8")
+	-- set_warnings("everything")
+	set_rundir("$(projectdir)/test/sol-test")

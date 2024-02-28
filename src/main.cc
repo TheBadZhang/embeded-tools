@@ -181,15 +181,23 @@ void drawFreeType_str(int x, int y, std::span<wchar_t> strw) {
 }
 */
 
+// #include "texture_image.h"
+
 // Simple helper function to load an image into a OpenGL texture with common settings
-bool LoadTextureFromFile(const char* filename, GLuint* out_texture, ImVec2& out_image_size) {
+bool LoadTextureFromFile(const char* filename, GLuint* out_texture, ImVec2& out_image_size, ::std::vector<uint8_t>& buf) {
+// ::ImGuiTextureImage* LoadTextureFromFile(const char* filename, GLuint* out_texture, ImVec2& out_image_size) {
 	// Load from file
 	int image_width = 0;
 	int image_height = 0;
 	unsigned char* image_data = stbi_load(filename, &image_width, &image_height, NULL, 4);
 	if (image_data == NULL)
 		return false;
-
+	buf.resize(image_width * image_height * 4);
+	memcpy(buf.data(), image_data, image_width * image_height * 4);
+	// ::ImGuiTextureImage* img = new ::ImGuiTextureImage(image_width, image_height);
+	// img->CopyTextureFromArray((int*)image_data);
+	// img->Update();
+	// return img;
 	// Create a OpenGL texture identifier
 	GLuint image_texture;
 	glGenTextures(1, &image_texture);
@@ -214,6 +222,21 @@ bool LoadTextureFromFile(const char* filename, GLuint* out_texture, ImVec2& out_
 	return true;
 }
 
+// Simple helper function to load an image into a OpenGL texture with common settings
+bool UpdateTextureFromBuffer(const char* buffer, const ImVec2& in_image_size, GLuint& in_texture) {
+	// Load from file
+	if (buffer == NULL)
+		return false;
+	int image_width = in_image_size.x;
+	int image_height = in_image_size.y;
+
+	::glBindTexture(GL_TEXTURE_2D, in_texture);
+	::glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image_width, image_height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+
+	return true;
+}
+
 
 static void glfw_error_callback(int error, const char* description) {
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
@@ -225,7 +248,14 @@ Image2Code image2code;
 #include "SerialMonitor.hpp"
 SerialMonitor serialMonitor;
 
-int main(int, char**) {
+int main(int argc, char** argv) {
+
+	::cmdline::parser pa;
+	pa.add<::std::string>("image", 'i', "image file name", false, "");
+	pa.parse_check(argc, argv);
+	::std::cout << pa.get<::std::string>("image") << ::std::endl;
+
+
 	// Setup window
 	glfwSetErrorCallback(glfw_error_callback);
 	if (!glfwInit())
@@ -290,7 +320,7 @@ int main(int, char**) {
 	IM_ASSERT(font != NULL);
 
 	// Our state
-	bool show_demo_window = false;
+	bool show_demo_window = true;
 	bool show_another_window = false;
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -302,6 +332,9 @@ int main(int, char**) {
 	image2code.setIO(&io);
 	serialMonitor.setIO(&io);
 
+	// ::std::cout << ::std::format("0x{:08x}", 0x1234) << ::std::endl;
+	std::cout << "\033[48;211;54;130;50mWorld! \033[0m";    // true colors
+	std::cout << std::endl;
 
 	// Main loop
 	for (;!glfwWindowShouldClose(window);
@@ -333,7 +366,7 @@ int main(int, char**) {
 		if (true) {
 			image2code.ui();
 		}
-		if (false) {
+		if (true) {
 			serialMonitor.ui();
 		}
 
@@ -347,8 +380,10 @@ int main(int, char**) {
 		}
 
 		// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-		if (show_demo_window)
-			ImGui::ShowDemoWindow(&show_demo_window);
+		if (show_demo_window) {
+			::ImGui::ShowDemoWindow(&show_demo_window);
+
+		}
 
 		// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
 		if (false) {

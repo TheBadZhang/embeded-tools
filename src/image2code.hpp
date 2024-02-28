@@ -1,21 +1,24 @@
 #pragma once
 
 #include "common.hpp"
+// bool LoadTextureFromBuffer(const char* buffer, const ImVec2& in_image_size, GLuint* out_texture);
 
+#include "libxbmp.hpp"
 class Image2Code {
 private:
 // public:
 	::std::string filePathName;
 	::std::string filePath;
 	ImGuiIO* io;
-
+	::tbz::PIC pic;
+	::std::vector<uint8_t> buf;
 	GLuint image_texture = 0;
 
 	ImVec2 my_image = ImVec2(0, 0);
 	GLuint my_image_texture = 0;
 	bool show_imgui_file_dialog = false;
 
-	void picture_preview (void);
+	void picture_preview (bool horizontal = false);
 
 	void open_picture(void);
 
@@ -33,7 +36,7 @@ private:
 		int contrast;
 	} image_adjust;
 
-	float transparent_colot[3] = { 1.0f, 0.0f, 0.2f };
+	float transparent_color[3] = { 1.0f, 0.0f, 0.2f };
 	bool is_sprite = false;
 	struct {
 		int width;
@@ -71,6 +74,7 @@ public:
 	Image2Code() {
 		filePathName.resize(1024);
 		filePath.resize(1024);
+		pic.setMode(::tbz::PIC::MODE::BIT32);
 	}
 	~Image2Code() {
 
