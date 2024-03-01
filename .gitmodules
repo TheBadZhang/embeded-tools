@@ -10,3 +10,12 @@
 [submodule "termcolor"]
 	path = termcolor
 	url = https://github.com/ikalnytskyi/termcolor.git
+[submodule "sub_test"]
+	path = sub_test
+	url = https://github.com/aiekick/ImGuiFileDialog.git
+[submodule "lib3"]
+	path = lib3
+	url = https://github.com/aiekick/ImGuiFileDialog.git
+[submodule "lib4/ImGuiFileDialog"]
+	path = lib4/ImGuiFileDialog
+	url = https://github.com/aiekick/ImGuiFileDialog.git
