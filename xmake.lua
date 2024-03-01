@@ -1,6 +1,7 @@
 add_rules("mode.debug", "mode.release")
 add_requires("imgui", {configs = {glfw_opengl3 = true}})
--- add_requires("imgui-file-dialog")
+add_repositories("local-repo required_repo")
+-- add_requires("imgui-file-dialog v0.6.7", {verify = false})
 
 -- https://github.com/nothings/stb
 -- 单文件 C 图像处理库
@@ -16,46 +17,30 @@ add_requires("serial")
 
 -- 源代码居然没有 #include <cstdint> 导致 uint8_t 编译错误
 -- add_requires("termcolor")
-add_requires("cmdline")
+-- 跨平台程序命令解析库
+add_requires("cli11 v2.4.1", {verify = false})
 add_requires("sol2", "lua", "nlohmann_json", "tinyexpr")
 
 if is_plat("windows") then
 	add_defines("__STDC_LIMIT_MACROS")
 end
 
-target("imgui-file-dialog")
-	set_kind("static")
-	set_languages("c++20")
-	add_files("./ImGuiFileDialog/ImGuiFileDialog.cpp")
-	add_includedirs("./ImGuiFileDialog", {public = true})
-	add_packages("imgui")
-	if is_plat("windows") and is_kind("shared") then
-		add_rules("utils.symbols.export_all", {export_classes = true})
-	end
-
-target("imgui_memory_editor")
-	set_kind("headeronly")
-	add_includedirs("./imgui_club/imgui_memory_editor", {public = true})
-
-target("imgui-knobs")
-	set_kind("static")
-	set_languages("c++20")
-	add_files("./imgui-knobs/imgui-knobs.cpp")
-	add_includedirs("./imgui-knobs", {public = true})
-	add_packages("imgui")
-
-target("termcolor")
-	set_kind("headeronly")
-	add_includedirs("./termcolor/include", {public = true})
+-- windows上还没有得到支持
+-- add_cxflags("-fuse-ld=mold")
+-- add_ldflags("-fuse-ld=mold", {force = true})
+-- add_arflags("-fuse-ld=mold", {force = true})
+includes("./required_repo")
 
 target("main")
 	set_kind("binary")
 	add_includedirs("src/")
 	add_files("src/*.cc", "src/*.cpp")
-	add_packages("cmdline", "sol2", "lua", "nlohmann_json", "tinyexpr")
+	add_packages("cli11")
+	add_packages("sol2", "lua", "nlohmann_json", "tinyexpr")
 	add_packages("imgui", "stb", "freetype", "serial")
-	add_deps("termcolor")
+	-- add_packages("imgui-file-dialog")
 	add_deps("imgui-file-dialog")
+	add_deps("termcolor")
 	add_deps("imgui_memory_editor")
 	add_deps("imgui-knobs")
 	set_languages("c++20")

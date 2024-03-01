@@ -1,21 +1,12 @@
-[submodule "imgui_club"]
-	path = imgui_club
+[submodule "required_repo/imgui_club"]
+	path = required_repo/imgui_club
 	url = https://github.com/ocornut/imgui_club.git
-[submodule "ImGuiFileDialog"]
-	path = ImGuiFileDialog
+[submodule "required_repo/ImGuiFileDialog"]
+	path = required_repo/ImGuiFileDialog
 	url = https://github.com/aiekick/ImGuiFileDialog.git
-[submodule "imgui-knobs"]
-	path = imgui-knobs
+[submodule "required_repo/imgui-knobs"]
+	path = required_repo/imgui-knobs
 	url = https://github.com/altschuler/imgui-knobs.git
-[submodule "termcolor"]
-	path = termcolor
+[submodule "required_repo/termcolor"]
+	path = required_repo/termcolor
 	url = https://github.com/ikalnytskyi/termcolor.git
-[submodule "sub_test"]
-	path = sub_test
-	url = https://github.com/aiekick/ImGuiFileDialog.git
-[submodule "lib3"]
-	path = lib3
-	url = https://github.com/aiekick/ImGuiFileDialog.git
-[submodule "lib4/ImGuiFileDialog"]
-	path = lib4/ImGuiFileDialog
-	url = https://github.com/aiekick/ImGuiFileDialog.git
