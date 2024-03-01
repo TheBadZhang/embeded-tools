@@ -249,12 +249,17 @@ Image2Code image2code;
 SerialMonitor serialMonitor;
 
 int main(int argc, char** argv) {
-
-	::cmdline::parser pa;
-	pa.add<::std::string>("image", 'i', "image file name", false, "");
-	pa.parse_check(argc, argv);
-	::std::cout << pa.get<::std::string>("image") << ::std::endl;
-
+	::CLI::App app{"App description"};
+	argv = app.ensure_utf8(argv);
+	std::string filename = "default";
+	app.add_option("-f,--file", filename, "A help string");
+	try {
+		app.parse(argc, argv);
+	} catch (const CLI::ParseError &e) {
+		return app.exit(e);
+	}
+	::std::cout << filename << ::std::endl;
+	::std::cout << ::std::format("0x{:08x}", 0x1234) << ::std::endl;
 
 	// Setup window
 	glfwSetErrorCallback(glfw_error_callback);
@@ -336,6 +341,7 @@ int main(int argc, char** argv) {
 	std::cout << "\033[48;211;54;130;50mWorld! \033[0m";    // true colors
 	std::cout << std::endl;
 
+
 	// Main loop
 	for (;!glfwWindowShouldClose(window);
 		[&]() -> void {
@@ -369,6 +375,7 @@ int main(int argc, char** argv) {
 		if (true) {
 			serialMonitor.ui();
 		}
+
 
 		if (false) {
 			::ImGui::Begin("图表测试");

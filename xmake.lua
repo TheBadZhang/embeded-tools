@@ -1,5 +1,6 @@
 add_rules("mode.debug", "mode.release")
 add_requires("imgui", {configs = {glfw_opengl3 = true}})
+-- git 中的私有库
 add_repositories("local-repo required_repo")
 -- add_requires("imgui-file-dialog v0.6.7", {verify = false})
 
@@ -26,11 +27,13 @@ if is_plat("windows") then
 end
 
 -- windows上还没有得到支持
+-- 但是 msvc 本身的链接速度已经足够可用
 -- add_cxflags("-fuse-ld=mold")
--- add_ldflags("-fuse-ld=mold", {force = true})
--- add_arflags("-fuse-ld=mold", {force = true})
-includes("./required_repo")
 
+
+-- git 库中的其他依赖
+includes("./required_repo")
+includes("./3rd")
 target("main")
 	set_kind("binary")
 	add_includedirs("src/")
@@ -39,13 +42,17 @@ target("main")
 	add_packages("sol2", "lua", "nlohmann_json", "tinyexpr")
 	add_packages("imgui", "stb", "freetype", "serial")
 	-- add_packages("imgui-file-dialog")
+	add_deps("dithering")
 	add_deps("imgui-file-dialog")
 	add_deps("termcolor")
 	add_deps("imgui_memory_editor")
 	add_deps("imgui-knobs")
 	set_languages("c++20")
 	set_encodings("utf-8")
-	-- set_warnings("everything")
+	if is_mode("release") then
+		set_warnings("everything")
+	end
 	set_rundir("$(projectdir)")
 
+-- 测试程序
 includes("./test")

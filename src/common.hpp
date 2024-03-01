@@ -10,10 +10,11 @@
 #include <cstdint>
 #include <algorithm>
 #include <format>
-
+#include <cstdlib>
+#include <cstring>
 
 #include <termcolor/termcolor.hpp>
-#include "cmdline.h"
+#include "CLI/CLI.hpp"
 #define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"

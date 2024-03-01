@@ -1,6 +1,8 @@
 #include "image2code.hpp"
 #include <imgui.h>
 
+#include "Dither.h"
+
 void Image2Code::gen_code_from_image_sprites(std::string path) {
 
 	int pic_width, pic_height, comp;
@@ -191,9 +193,36 @@ void Image2Code::open_picture(void) {
 				filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
 
 				bool ret = LoadTextureFromFile(filePathName.c_str(), &my_image_texture, my_image, buf);
+				int width = my_image.x;
+				int height = my_image.y;
+				::std::vector<uint8_t> buf2;
+				buf2.resize(width * height);
+				for (int i = 0; i < width; i++) {
+					for (int j = 0; j < height; j++) {
+						uint32_t c = getpixel(i, j, buf.data(), width, height);
+						uint8_t r = c & 0xff;
+						uint8_t g = (c >> 8) & 0xff;
+						uint8_t b = (c >> 16) & 0xff;
+						uint8_t gray = 0.299*r + 0.587*g + 0.114*b;
+						*(buf2.data() + (i + j * width)) = gray;
+					}
+				}
+				Dither dd(width, height);
+				dd.buildBayerPattern();
+				// dd.patternDither(buf2.data(), 0);
+				// dd.PersonalFilterDither(buf2.data());
+				dd.thresholding(buf2.data(), 128);
+				pic.set_pic(buf.data(), width, height);
+				for (int i = 0; i < width; i++) {
+					for (int j = 0; j < height; j++) {
+						uint8_t c = *(buf2.data() + (i + j * width));
+						uint32_t color = c << 24 | c << 16 | c << 8 | 0xff;
+						// putpixel(i, j, color);
+						pic.setColor(color);
+						pic.drawPixel(i, j);
+					}
+				}
 				// pic = LoadTextureFromFile(filePathName.c_str(), &my_image_texture, my_image);
-				// int width = my_image.x;
-				// int height = my_image.y;
 				// buf.resize(width * height * 4);
 				IM_ASSERT(ret);
 			}
